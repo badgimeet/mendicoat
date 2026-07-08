@@ -134,7 +134,8 @@ const PeerBridge = (() => {
   function _setupHostListeners() {
     _peer.on('connection', (conn) => {
       console.log('[PeerBridge] guest connected:', conn.peer);
-      conn.on('open', () => { _guestConns.push(conn); });
+      // Push immediately — _broadcast already checks c.open before sending
+      _guestConns.push(conn);
 
       conn.on('data', (msg) => _handleHostMessage(conn, msg));
 
@@ -177,7 +178,11 @@ const PeerBridge = (() => {
     switch (type) {
 
       case 'createRoom': {
-        const r = RoomMgr.createRoom(_myId, data.name);
+        // IMPORTANT: Extract the room code from the host's own peer ID
+        // (format: "mendi-XXXXX") so the displayed code matches the peer ID
+        // guests use to connect. Do NOT let roomManager generate a different code.
+        const code = _myId.replace(/^mendi-/, '');
+        const r = RoomMgr.createRoom(_myId, data.name, code);
         cb({ code: r.code, room: _publicRoom(r) });
         break;
       }

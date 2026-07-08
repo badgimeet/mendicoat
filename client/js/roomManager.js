@@ -17,9 +17,15 @@ function generateCode() {
 function getRoom() { return room; }
 
 // ─── Lobby ────────────────────────────────────────────────────────────────────
-function createRoom(hostPeerId, hostName) {
+/**
+ * @param {string} hostPeerId
+ * @param {string} hostName
+ * @param {string} [roomCode]  Optional — caller can supply the code so it matches
+ *                             the PeerJS peer ID. Falls back to generateCode().
+ */
+function createRoom(hostPeerId, hostName, roomCode) {
   room = {
-    code:        generateCode(),
+    code:        roomCode || generateCode(),
     host:        hostPeerId,
     players:     [{ id: hostPeerId, name: hostName, teamIndex: 0, seatIndex: 0 }],
     playerCount: 4,          // host can change before start
@@ -30,6 +36,7 @@ function createRoom(hostPeerId, hostName) {
   };
   return room;
 }
+
 
 function joinRoom(peerId, playerName) {
   if (!room)                                   return { error: 'Room not found' };
