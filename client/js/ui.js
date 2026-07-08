@@ -124,6 +124,53 @@ const UI = (() => {
     }, 520);
   }
 
+  // ── Build the tricks + tens row for a player ───────────────────────────
+  /**
+   * Returns a .player-tricks-row element showing:
+   *   - a card-back stack with count for regular tricks
+   *   - individual face-up mini 10-cards for each mendi won
+   *
+   * @param {number} tricks    - total tricks won by this player's team
+   * @param {Array}  mendiList - array of { rank:'10', suit:'S'|'H'|'D'|'C' }
+   *                             for each 10 the team has captured
+   */
+  function _buildTricksRow(tricks, mendiList) {
+    const row = document.createElement('div');
+    row.className = 'player-tricks-row';
+
+    // Trick stack (non-mendi tricks)
+    const nonMendiTricks = tricks - (mendiList ? mendiList.length : 0);
+    if (tricks > 0) {
+      const stack = document.createElement('div');
+      stack.className = 'trick-stack';
+      const icon = document.createElement('span');
+      icon.className = 'trick-stack-icon';
+      const count = document.createElement('span');
+      count.className = 'trick-stack-count';
+      count.textContent = tricks;
+      stack.appendChild(icon);
+      stack.appendChild(count);
+      row.appendChild(stack);
+    }
+
+    // Face-up mini 10 cards
+    if (mendiList && mendiList.length > 0) {
+      mendiList.forEach(mendi => {
+        const mini = document.createElement('div');
+        mini.className = 'mendi-mini';
+        mini.setAttribute('aria-label', `10 of ${SUIT_NAMES[mendi.suit] || mendi.suit}`);
+        const redClass = isRed(mendi.suit) ? ' red' : '';
+        mini.innerHTML = `
+          <span class="mendi-mini-rank${redClass}">10</span>
+          <span class="mendi-mini-suit${redClass}">${suitSymbol(mendi.suit)}</span>
+        `;
+        row.appendChild(mini);
+      });
+    }
+
+    return row;
+  }
+
   // ── Opponents (positioned around table) ───────────────────────────────
   /**
    * Place opponent players around the table using absolute positioning.
@@ -131,7 +178,7 @@ const UI = (() => {
    * With 6 players: top-left, top-right, left, right, bottom-left (excluded = me).
    * Strategy: evenly distribute opponents around a circle.
    */
-  function renderOpponents(players, myIndex, tricksWon, currentTurn) {
+  function renderOpponents(players, myIndex, tricksWon, tensWon, currentTurn) {
     const area = document.getElementById('opponents-area');
     if (!area) return;
     area.innerHTML = '';
@@ -140,13 +187,13 @@ const UI = (() => {
     const total = opponents.length;
     if (total === 0) return;
 
-    // Positions as percentages of the table area container
-    // We assign positions on a semicircle (top half + sides)
     const positions = _getOpponentPositions(total);
 
     opponents.forEach((player, idx) => {
       const pos = positions[idx];
-      const el  = _buildOpponentEl(player, tricksWon, currentTurn);
+      const teamTricks = tricksWon?.[player.teamIndex] ?? 0;
+      const teamMendis = tensWon?.[player.teamIndex] ?? [];
+      const el  = _buildOpponentEl(player, teamTricks, teamMendis, currentTurn);
       el.style.left = pos.x;
       el.style.top  = pos.y;
       el.style.transform = 'translate(-50%, -50%)';
@@ -155,8 +202,6 @@ const UI = (() => {
   }
 
   function _getOpponentPositions(count) {
-    // Distribute positions across top 270° arc (leaving bottom for my hand)
-    // Angles from -135° to +135° mapped to left/top percentages
     const positions = [];
     const startAngle = -130;
     const endAngle   = 130;
@@ -165,7 +210,6 @@ const UI = (() => {
     for (let i = 0; i < count; i++) {
       const angleDeg = count === 1 ? 0 : startAngle + step * i;
       const angleRad = (angleDeg * Math.PI) / 180;
-      // Map to 15–85% range on each axis, radius ~40%
       const cx = 50, cy = 42, rx = 36, ry = 32;
       const x = cx + rx * Math.sin(angleRad);
       const y = cy - ry * Math.cos(angleRad);
@@ -174,9 +218,8 @@ const UI = (() => {
     return positions;
   }
 
-  function _buildOpponentEl(player, tricksWon, currentTurn) {
+  function _buildOpponentEl(player, teamTricks, teamMendis, currentTurn) {
     const isActive = player.id === currentTurn;
-    const teamTricks = tricksWon?.[player.teamIndex] ?? 0;
 
     const el = document.createElement('div');
     el.className = 'opponent-player';
@@ -196,14 +239,13 @@ const UI = (() => {
     nameTag.dataset.playerId = player.id;
     nameTag.textContent = player.name;
 
-    const tricksBadge = document.createElement('div');
-    tricksBadge.className = 'opponent-tricks-badge';
-    tricksBadge.dataset.playerId = `tricks-${player.id}`;
-    tricksBadge.textContent = `Team: ${teamTricks} tricks`;
+    // Tricks + tens row under name
+    const tricksRow = _buildTricksRow(teamTricks, teamMendis);
+    tricksRow.dataset.playerId = `tricks-${player.id}`;
 
     el.appendChild(backs);
     el.appendChild(nameTag);
-    el.appendChild(tricksBadge);
+    el.appendChild(tricksRow);
 
     return el;
   }
@@ -214,11 +256,29 @@ const UI = (() => {
     });
   }
 
-  function updateOpponentTricks(players, tricksWon) {
+  function updateOpponentTricks(players, tricksWon, tensWon) {
     players.forEach(p => {
-      const el = document.querySelector(`[data-player-id="tricks-${p.id}"]`);
-      if (el) el.textContent = `Team: ${tricksWon[p.teamIndex] ?? 0} tricks`;
+      const container = document.querySelector(`[data-player-id="tricks-${p.id}"]`);
+      if (!container) return;
+      const teamTricks = tricksWon?.[p.teamIndex] ?? 0;
+      const teamMendis = tensWon?.[p.teamIndex] ?? [];
+      const newRow = _buildTricksRow(teamTricks, teamMendis);
+      newRow.dataset.playerId = `tricks-${p.id}`;
+      container.replaceWith(newRow);
     });
+  }
+
+  // ── My tricks row (under my name in my-area) ──────────────────────────
+  function updateMyTricksRow(myTeam, tricksWon, tensWon) {
+    const container = document.getElementById('my-tricks-row');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const teamTricks = tricksWon?.[myTeam] ?? 0;
+    const teamMendis = tensWon?.[myTeam] ?? [];
+    const row = _buildTricksRow(teamTricks, teamMendis);
+    // Append children (not the wrapper) so the my-info-bar layout stays flat
+    Array.from(row.children).forEach(child => container.appendChild(child));
   }
 
   // ── Trump reveal ───────────────────────────────────────────────────────
@@ -249,7 +309,7 @@ const UI = (() => {
       slot.innerHTML = `
         <div class="slot-avatar">${initial}</div>
         <div class="slot-info">
-          <div class="slot-name">${_esc(p.name)}${isHost ? '' : ''}</div>
+          <div class="slot-name">${_esc(p.name)}</div>
           ${isHost ? '<div class="slot-host-badge">⭐ Host</div>' : ''}
         </div>
         <span class="team-badge t${p.teamIndex}">${teamLabel}</span>
@@ -340,6 +400,7 @@ const UI = (() => {
     renderOpponents,
     updateOpponentTurnHighlight,
     updateOpponentTricks,
+    updateMyTricksRow,
     showTrump,
     renderPlayerSlots,
     renderResultScreen,

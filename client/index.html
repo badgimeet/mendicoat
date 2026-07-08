@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Mendicoat — Classic Indian Card Game</title>
   <meta name="description" content="Play Mendicoat online with friends — the classic Indian trick-taking card game, beautifully redesigned for the web." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -24,6 +24,8 @@
       <span class="deco d4">♣</span>
       <span class="deco d5">♠</span>
       <span class="deco d6">♥</span>
+      <span class="deco d7">♦</span>
+      <span class="deco d8">♣</span>
     </div>
 
     <div class="lobby-center">
@@ -117,7 +119,7 @@
   ═══════════════════════════════════════════════════════════ -->
   <div id="screen-game" class="screen">
 
-    <!-- HUD bar -->
+    <!-- HUD bar (Round + Trump + Scores) -->
     <div class="game-hud" role="region" aria-label="Game status">
       <div class="hud-item">
         <span class="hud-label">Round</span>
@@ -131,10 +133,6 @@
         <span id="hud-score-0" class="hud-score-chip t0">A: 0</span>
         <span class="hud-score-sep">vs</span>
         <span id="hud-score-1" class="hud-score-chip t1">B: 0</span>
-      </div>
-      <div class="hud-item hud-tricks">
-        <span class="hud-label">Tricks</span>
-        <span id="hud-tricks-display" class="hud-value">0–0</span>
       </div>
     </div>
 
@@ -155,8 +153,25 @@
       <div id="my-hand" class="my-hand" role="region" aria-label="Your hand"></div>
       <div class="my-info-bar">
         <span id="my-name-tag" class="my-name-tag"></span>
-        <span id="my-tricks-count" class="my-tricks-count"></span>
-        <span id="my-tens-count" class="my-tens-count"></span>
+        <div id="my-tricks-row" class="my-tricks-row"></div>
+      </div>
+    </div>
+
+    <!-- Chat FAB -->
+    <button id="chat-fab" class="chat-fab" aria-label="Open chat" onclick="ChatUI.toggle()">💬</button>
+
+    <!-- Chat panel -->
+    <div id="chat-panel" class="chat-panel" role="complementary" aria-label="In-game chat">
+      <div class="chat-header">
+        <span>Chat</span>
+        <button class="chat-close-btn" id="chat-close" aria-label="Close chat" onclick="ChatUI.toggle()">✕</button>
+      </div>
+      <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
+      <div class="chat-emoji-row" id="chat-emoji-row" aria-label="Quick emoji reactions"></div>
+      <div class="chat-input-row">
+        <input id="chat-input" type="text" placeholder="Message…" maxlength="80"
+          autocomplete="off" aria-label="Chat message" />
+        <button id="chat-send" class="chat-send-btn" aria-label="Send message">➤</button>
       </div>
     </div>
   </div>
@@ -225,5 +240,6 @@
   <script src="js/ui.js"   defer></script>
   <script src="js/peer.js" defer></script>
   <script src="js/app.js"  defer></script>
+  <script src="js/chat.js" defer></script>
 </body>
 </html>

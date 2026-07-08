@@ -24,6 +24,7 @@ const App = (() => {
     ledSuit:     null,
     tricksWon:   { 0: 0, 1: 0 },
     tensWon:     { 0: 0, 1: 0 },
+    mendiCards:  { 0: [], 1: [] },
     matchScores: { 0: 0, 1: 0 },
     totalTricks: 13,
     round:       1,
@@ -196,6 +197,7 @@ const App = (() => {
       players: [], playerCount: 4, myHand: [], myTeam: 0, mySeat: 0,
       currentTurn: null, trump: null, ledSuit: null,
       tricksWon: { 0: 0, 1: 0 }, tensWon: { 0: 0, 1: 0 },
+      mendiCards: { 0: [], 1: [] },
       matchScores: { 0: 0, 1: 0 }, round: 1, trickCards: [],
     });
     showScreen('screen-lobby');
@@ -250,6 +252,7 @@ const App = (() => {
     state.winTarget   = data.winTarget;
     state.tricksWon   = { 0: 0, 1: 0 };
     state.tensWon     = { 0: 0, 1: 0 };
+    state.mendiCards  = { 0: [], 1: [] };
     state.ledSuit     = null;
     state.trickCards  = [];
 
@@ -284,6 +287,7 @@ const App = (() => {
     }
     state.tricksWon   = tricksWon;
     state.tensWon     = tensWon;
+    state.mendiCards  = data.mendiCards || { 0: [], 1: [] };
     state.currentTurn = winnerId;
     state.ledSuit     = null;
 
@@ -303,7 +307,7 @@ const App = (() => {
       _updateHudTricks();
     });
 
-    UI.updateOpponentTricks(state.players, state.tricksWon);
+    UI.updateOpponentTricks(state.players, state.tricksWon, state.mendiCards);
   }
 
   function onRoundEnd(data) {
@@ -334,6 +338,19 @@ const App = (() => {
     UI.renderPlayerSlots(players, state.playerCount);
   }
 
+  // ── Chat ───────────────────────────────────────────────────────────────
+  function sendChat(text) {
+    if (!text || !text.trim()) return;
+    PeerBridge.emit('chat', {
+      senderName: state.myName || 'Unknown',
+      text: text.trim(),
+    }, () => {});
+  }
+
+  function onChatMessage(data) {
+    if (typeof ChatUI !== 'undefined') ChatUI.onMessage(data);
+  }
+
   // ── Private: render the full game screen layout ────────────────────────
   function _renderGameScreen() {
     document.getElementById('hud-round').textContent = state.round;
@@ -345,7 +362,7 @@ const App = (() => {
     document.getElementById('my-name-tag').textContent = state.myName || '';
 
     const myIndex = state.players.findIndex(p => p.id === state.myId);
-    UI.renderOpponents(state.players, myIndex, state.tricksWon, state.currentTurn);
+    UI.renderOpponents(state.players, myIndex, state.tricksWon, state.mendiCards, state.currentTurn);
 
     const isMyTurn = state.currentTurn === state.myId;
     UI.renderMyHand(state.myHand, isMyTurn, state.trump, state.ledSuit, playCard);
@@ -388,11 +405,8 @@ const App = (() => {
     const el = document.getElementById('hud-tricks-display');
     if (el) el.textContent = `${state.tricksWon[0]}–${state.tricksWon[1]}`;
 
-    const myTricks = document.getElementById('my-tricks-count');
-    const myTens   = document.getElementById('my-tens-count');
-    if (myTricks) myTricks.textContent = `Tricks: ${state.tricksWon[state.myTeam]}`;
-    if (myTens)   myTens.textContent   = state.tensWon[state.myTeam] > 0
-      ? `10s: ${state.tensWon[state.myTeam]}` : '';
+    // Per-player tricks row under my name
+    UI.updateMyTricksRow(state.myTeam, state.tricksWon, state.mendiCards);
   }
 
   // ── Public API ─────────────────────────────────────────────────────────
@@ -418,5 +432,8 @@ const App = (() => {
     onRoundEnd,
     onMatchOver,
     onPlayerLeft,
+    // Chat
+    sendChat,
+    onChatMessage,
   };
 })();

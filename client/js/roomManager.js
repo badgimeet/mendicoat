@@ -86,6 +86,7 @@ function startGame(hostPeerId) {
     currentTurn:  firstTurn,
     tricksWon:    { 0: 0, 1: 0 },
     tensWon:      { 0: 0, 1: 0 },
+    mendiCards:   { 0: [], 1: [] }, // actual 10-card objects captured per team
     totalTricks,
   };
   return { room };
@@ -127,7 +128,12 @@ function playCard(peerId, cardId) {
 
     const winnerPlayer = room.players.find(p => p.id === winnerId);
     game.tricksWon[winnerPlayer.teamIndex]++;
-    game.trick.forEach(t => { if (t.card.rank === '10') game.tensWon[t.teamIndex]++; });
+    game.trick.forEach(t => {
+      if (t.card.rank === '10') {
+        game.tensWon[t.teamIndex]++;
+        game.mendiCards[t.teamIndex].push({ rank: t.card.rank, suit: t.card.suit });
+      }
+    });
 
     const completedTrick = { trick: [...game.trick], winnerId, trump: game.trump };
     game.trickHistory.push(completedTrick);
@@ -156,6 +162,7 @@ function playCard(peerId, cardId) {
           scores, mendikot,
           tricksWon:   { ...game.tricksWon },
           tensWon:     { ...game.tensWon },
+          mendiCards:  { 0: [...game.mendiCards[0]], 1: [...game.mendiCards[1]] },
           matchScores: { ...room.matchScores },
           matchWinner,
         },
@@ -167,10 +174,11 @@ function playCard(peerId, cardId) {
       event: 'trickEnd',
       data: {
         winnerId,
-        trick:     completedTrick.trick,
-        trump:     game.trump,
-        tricksWon: { ...game.tricksWon },
-        tensWon:   { ...game.tensWon },
+        trick:      completedTrick.trick,
+        trump:      game.trump,
+        tricksWon:  { ...game.tricksWon },
+        tensWon:    { ...game.tensWon },
+        mendiCards: { 0: [...game.mendiCards[0]], 1: [...game.mendiCards[1]] },
       },
     };
   }

@@ -233,6 +233,19 @@ const PeerBridge = (() => {
         break;
       }
 
+      case 'chat': {
+        // Host broadcasts chat message to all guests and updates its own UI
+        const chatPayload = {
+          senderId:   actorId,
+          senderName: data.senderName || 'Unknown',
+          text:       data.text || '',
+        };
+        _broadcast('chat', chatPayload);
+        if (typeof App !== 'undefined') App.onChatMessage(chatPayload);
+        cb({ ok: true });
+        break;
+      }
+
       default:
         cb({ error: `Unknown event: ${type}` });
     }
@@ -263,6 +276,7 @@ const PeerBridge = (() => {
       case 'trickEnd':    App.onTrickEnd(data);    break;
       case 'roundEnd':    App.onRoundEnd(data);    break;
       case 'matchOver':   App.onMatchOver(data);   break;
+      case 'chat':      App.onChatMessage(data);  break;
       case 'playerLeft':  App.onPlayerLeft(data);  break;
       default: console.warn('[PeerBridge] unknown push event:', type);
     }
