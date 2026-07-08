@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mendicoat — Classic Indian Card Game</title>
+  <meta name="description" content="Play Mendicoat online with friends — the classic Indian trick-taking card game, beautifully redesigned for the web." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SCREEN 1 — LOBBY (Create / Join)
+  ═══════════════════════════════════════════════════════════ -->
+  <div id="screen-lobby" class="screen active">
+    <!-- Decorative floating suit symbols -->
+    <div class="lobby-bg" aria-hidden="true">
+      <span class="deco d1">♠</span>
+      <span class="deco d2">♥</span>
+      <span class="deco d3">♦</span>
+      <span class="deco d4">♣</span>
+      <span class="deco d5">♠</span>
+      <span class="deco d6">♥</span>
+    </div>
+
+    <div class="lobby-center">
+      <!-- Logo -->
+      <header class="logo-block">
+        <div class="logo-suit" aria-hidden="true">♠</div>
+        <h1 class="logo-title">Mendicoat</h1>
+        <p class="logo-sub">The Classic Indian Card Game</p>
+      </header>
+
+      <!-- Glass panel -->
+      <div class="glass-panel lobby-panel">
+        <div class="tab-row" role="tablist">
+          <button id="btn-tab-create" class="tab-btn active" role="tab" aria-selected="true"
+            onclick="App.switchTab('create')">Create Room</button>
+          <button id="btn-tab-join" class="tab-btn" role="tab" aria-selected="false"
+            onclick="App.switchTab('join')">Join Room</button>
+        </div>
+
+        <!-- Create tab -->
+        <div id="tab-create" class="tab-content active" role="tabpanel">
+          <label for="input-create-name">Your Name</label>
+          <input id="input-create-name" type="text" placeholder="Enter your name"
+            maxlength="20" autocomplete="off" />
+          <button id="btn-create" class="btn-primary" onclick="App.createRoom()">
+            Create Room <span class="btn-arrow">→</span>
+          </button>
+        </div>
+
+        <!-- Join tab -->
+        <div id="tab-join" class="tab-content" role="tabpanel">
+          <label for="input-join-name">Your Name</label>
+          <input id="input-join-name" type="text" placeholder="Enter your name"
+            maxlength="20" autocomplete="off" />
+          <label for="input-join-code">Room Code</label>
+          <input id="input-join-code" type="text" placeholder="ABC123"
+            maxlength="6" autocomplete="off" class="code-input" />
+          <button id="btn-join" class="btn-primary" onclick="App.joinRoom()">
+            Join Room <span class="btn-arrow">→</span>
+          </button>
+        </div>
+
+        <div id="lobby-error" class="error-msg" role="alert" aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SCREEN 2 — WAITING ROOM
+  ═══════════════════════════════════════════════════════════ -->
+  <div id="screen-waiting" class="screen">
+    <div class="waiting-center">
+      <div class="glass-panel waiting-panel">
+
+        <div class="waiting-header">
+          <div>
+            <h2>Waiting Room</h2>
+            <p class="room-code-row">
+              Code: <strong id="display-room-code" class="room-code-badge">——</strong>
+              <button class="btn-copy" id="btn-copy-code" onclick="App.copyCode()"
+                title="Copy room code" aria-label="Copy room code">⧉</button>
+            </p>
+          </div>
+          <div id="match-score-preview" class="match-score-preview"></div>
+        </div>
+
+        <!-- Host-only controls -->
+        <div id="host-controls" class="host-controls hidden">
+          <span class="control-label">Players</span>
+          <div class="count-buttons" role="group" aria-label="Select player count">
+            <button class="count-btn active" data-count="4" onclick="App.setPlayerCount(4)">4</button>
+            <button class="count-btn" data-count="6" onclick="App.setPlayerCount(6)">6</button>
+            <button class="count-btn" data-count="8" onclick="App.setPlayerCount(8)">8</button>
+          </div>
+        </div>
+
+        <!-- Player slots -->
+        <div id="player-slots" class="player-slots" aria-label="Players in room"></div>
+
+        <p id="waiting-status" class="waiting-status" aria-live="polite">Waiting for players…</p>
+
+        <button id="btn-start" class="btn-primary btn-start hidden" onclick="App.startGame()">
+          Start Game ▶
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SCREEN 3 — GAME TABLE
+  ═══════════════════════════════════════════════════════════ -->
+  <div id="screen-game" class="screen">
+
+    <!-- HUD bar -->
+    <div class="game-hud" role="region" aria-label="Game status">
+      <div class="hud-item">
+        <span class="hud-label">Round</span>
+        <span id="hud-round" class="hud-value">1</span>
+      </div>
+      <div class="hud-item hud-trump">
+        <span class="hud-label">Trump</span>
+        <span id="hud-trump-suit" class="hud-trump-suit">—</span>
+      </div>
+      <div class="hud-item hud-scores">
+        <span id="hud-score-0" class="hud-score-chip t0">A: 0</span>
+        <span class="hud-score-sep">vs</span>
+        <span id="hud-score-1" class="hud-score-chip t1">B: 0</span>
+      </div>
+      <div class="hud-item hud-tricks">
+        <span class="hud-label">Tricks</span>
+        <span id="hud-tricks-display" class="hud-value">0–0</span>
+      </div>
+    </div>
+
+    <!-- Table area: opponent positions + center -->
+    <div class="table-area">
+      <div id="opponents-area" class="opponents-area"></div>
+
+      <!-- Felt surface with trick cards -->
+      <div class="table-surface" role="region" aria-label="Current trick">
+        <div id="trick-area" class="trick-area"></div>
+        <div id="turn-announcement" class="turn-announcement" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <!-- My hand at bottom -->
+    <div class="my-area">
+      <div id="my-turn-indicator" class="my-turn-indicator" aria-live="polite"></div>
+      <div id="my-hand" class="my-hand" role="region" aria-label="Your hand"></div>
+      <div class="my-info-bar">
+        <span id="my-name-tag" class="my-name-tag"></span>
+        <span id="my-tricks-count" class="my-tricks-count"></span>
+        <span id="my-tens-count" class="my-tens-count"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SCREEN 4 — ROUND END / RESULTS
+  ═══════════════════════════════════════════════════════════ -->
+  <div id="screen-result" class="screen">
+    <div class="result-center">
+      <div class="glass-panel result-panel">
+
+        <div id="mendikot-badge" class="mendikot-badge hidden" aria-live="assertive">
+          ⭐ MENDIKOT! ⭐
+        </div>
+
+        <h2 id="result-heading" class="result-heading">Round Over</h2>
+
+        <div class="result-teams">
+          <div class="result-team-card t0">
+            <div id="result-team0-name" class="result-team-name">Team A</div>
+            <div id="result-team0-score" class="result-team-score">+0</div>
+            <div id="result-team0-tricks" class="result-team-detail"></div>
+          </div>
+          <div class="result-divider">vs</div>
+          <div class="result-team-card t1">
+            <div id="result-team1-name" class="result-team-name">Team B</div>
+            <div id="result-team1-score" class="result-team-score">+0</div>
+            <div id="result-team1-tricks" class="result-team-detail"></div>
+          </div>
+        </div>
+
+        <div class="match-score-total">
+          Match:
+          <span id="match-total-0" class="match-chip t0">A: 0</span>
+          vs
+          <span id="match-total-1" class="match-chip t1">B: 0</span>
+        </div>
+
+        <div id="match-winner-banner" class="match-winner-banner hidden"></div>
+
+        <div class="result-actions">
+          <button id="btn-next-round" class="btn-primary hidden" onclick="App.startNextRound()">
+            Next Round ▶
+          </button>
+          <button class="btn-secondary" onclick="App.backToLobby()">Back to Lobby</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/socket.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
