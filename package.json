@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "nodemon server/index.js",
-    "test": "jest --testPathPattern=server/tests"
+    "test": "jest --testPathPatterns=server/tests"
   },
   "keywords": ["card-game", "mendicoat", "mendikot", "multiplayer"],
   "author": "",
