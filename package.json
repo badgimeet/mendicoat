@@ -1,0 +1,22 @@
+{
+  "name": "mendicoat",
+  "version": "1.0.0",
+  "description": "Classic Indian trick-taking card game — real-time multiplayer",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
+    "test": "jest --testPathPattern=server/tests"
+  },
+  "keywords": ["card-game", "mendicoat", "mendikot", "multiplayer"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "jest": "^30.4.2",
+    "nodemon": "^3.1.14"
+  }
+}
