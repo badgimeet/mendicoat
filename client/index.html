@@ -207,10 +207,23 @@
     </div>
   </div>
 
-  <!-- Scripts -->
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/socket.js"></script>
-  <script src="js/app.js"></script>
+  <!-- PeerJS (WebRTC signalling + data channels, free public server) -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
+  <!--
+    Load ES modules (gameEngine + roomManager) and expose them on window._RoomMgr
+    so peer.js (a classic script) can call them when running as host.
+    type="module" scripts are deferred by default, so they run before the
+    defer scripts below.
+  -->
+  <script type="module">
+    import * as RoomMgr from './js/roomManager.js';
+    window._RoomMgr = RoomMgr;
+  </script>
+
+  <!-- Classic scripts — load in dependency order, all deferred -->
+  <script src="js/ui.js"   defer></script>
+  <script src="js/peer.js" defer></script>
+  <script src="js/app.js"  defer></script>
 </body>
 </html>
