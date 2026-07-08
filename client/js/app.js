@@ -278,16 +278,18 @@ const App = (() => {
     state.myHand = hand;
     const isMyTurn = state.currentTurn === state.myId;
     UI.renderMyHand(state.myHand, isMyTurn, state.trump, state.ledSuit, playCard);
+    // Sync the turn indicator now that we have a fresh hand
+    _updateTurnUI();
   }
 
-  function onTrickEnd({ winnerId, trick, trump, tricksWon, tensWon }) {
+  function onTrickEnd({ winnerId, trick, trump, tricksWon, tensWon, mendiCards }) {
     if (trump && !state.trump) {
       state.trump = trump;
       UI.showTrump(trump);
     }
     state.tricksWon   = tricksWon;
     state.tensWon     = tensWon;
-    state.mendiCards  = data.mendiCards || { 0: [], 1: [] };
+    state.mendiCards  = mendiCards || { 0: [], 1: [] };
     state.currentTurn = winnerId;
     state.ledSuit     = null;
 
@@ -388,7 +390,9 @@ const App = (() => {
       }
     }
 
-    UI.renderMyHand(state.myHand, isMyTurn, state.trump, state.ledSuit, playCard);
+    // NOTE: do NOT re-render hand here — hand is rendered by onHandUpdate
+    // or explicitly by _renderGameScreen. Re-rendering here causes a flash
+    // because currentTurn may not match myId yet when this fires.
     UI.updateOpponentTurnHighlight(state.currentTurn);
   }
 

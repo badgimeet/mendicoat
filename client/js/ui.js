@@ -80,6 +80,26 @@ const UI = (() => {
     // Determine which cards are legally playable
     const hasLedSuit = ledSuit ? sorted.some(c => c.suit === ledSuit) : false;
 
+    // ── Dynamic overlap so cards never crowd off-screen ────────────────────
+    // Detect rendered card width from CSS (fallback 60px desktop / 48px mobile)
+    const cardW   = window.innerWidth <= 480 ? 48 : (window.innerWidth <= 360 ? 42 : 60);
+    const n       = sorted.length;
+    // Available width for the fan (leave 32px padding each side)
+    const avail   = Math.min(container.offsetWidth || window.innerWidth, window.innerWidth) - 64;
+    // Desired visible portion of each card (min 22px so rank is readable)
+    const minVis  = 22;
+    // Maximum overlap = cardW - minVis (leaving minVis visible)
+    // Optimal: spread n cards so total width = avail
+    // totalWidth = cardW + (n-1) * (cardW + overlap)  →  overlap = (avail - cardW) / (n-1) - cardW
+    let overlap = 0;
+    if (n > 1) {
+      const ideal = (avail - cardW) / (n - 1) - cardW;
+      // ideal is negative (it's the margin-right). Clamp so visible portion ≥ minVis
+      overlap = Math.max(ideal, -(cardW - minVis));
+      overlap = Math.min(overlap, -4); // never positive (always fan)
+    }
+    container.style.setProperty('--card-overlap', `${Math.round(overlap)}px`);
+
     sorted.forEach((card) => {
       const isLegal = isMyTurn && (
         !ledSuit ||
@@ -90,6 +110,7 @@ const UI = (() => {
       container.appendChild(el);
     });
   }
+
 
   // ── Trick Area (center table) ──────────────────────────────────────────
   function renderTrickArea(trickCards) {
