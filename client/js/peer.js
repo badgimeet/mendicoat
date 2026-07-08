@@ -340,7 +340,11 @@ const PeerBridge = (() => {
 
     } else if (result.event === 'roundEnd') {
       const teamNames = _buildTeamNames(room.players);
-      const ev = { ...result.data, teamNames };
+      // Include the last completed trick so clients can show the final card
+      // before transitioning to the result screen.
+      const history = room.game.trickHistory;
+      const lastTrick = history.length > 0 ? history[history.length - 1] : null;
+      const ev = { ...result.data, teamNames, lastTrick };
       _broadcast('roundEnd', ev);
       if (typeof App !== 'undefined') App.onRoundEnd(ev);
       if (result.data.matchWinner !== null) {
@@ -353,6 +357,7 @@ const PeerBridge = (() => {
         if (typeof App !== 'undefined') App.onMatchOver(mv);
       }
     }
+
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────

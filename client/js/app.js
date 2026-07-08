@@ -286,7 +286,15 @@ const App = (() => {
     state.tensWon     = tensWon;
     state.currentTurn = winnerId;
     state.ledSuit     = null;
-    state.trickCards  = [];
+
+    // ── Show the COMPLETE trick (including the last card that triggered trickEnd)
+    // before sweeping. Without this, the Nth player's card is never visible.
+    state.trickCards = trick.map(t => ({
+      playerId:   t.playerId,
+      card:       t.card,
+      playerName: state.players.find(p => p.id === t.playerId)?.name || '?',
+    }));
+    UI.renderTrickArea(state.trickCards);
 
     UI.sweepTrick(winnerId, () => {
       state.trickCards = [];
@@ -300,8 +308,19 @@ const App = (() => {
 
   function onRoundEnd(data) {
     state.matchScores = data.matchScores;
-    showScreen('screen-result');
-    UI.renderResultScreen(data, state.teamNames, state.isHost);
+    // Show the last trick (if provided) before transitioning to result screen
+    if (data.lastTrick && data.lastTrick.trick) {
+      state.trickCards = data.lastTrick.trick.map(t => ({
+        playerId:   t.playerId,
+        card:       t.card,
+        playerName: state.players.find(p => p.id === t.playerId)?.name || '?',
+      }));
+      UI.renderTrickArea(state.trickCards);
+    }
+    setTimeout(() => {
+      showScreen('screen-result');
+      UI.renderResultScreen(data, state.teamNames, state.isHost);
+    }, 1500);
   }
 
   function onMatchOver({ winner, matchScores, teamNames }) {
