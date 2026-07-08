@@ -1,7 +1,8 @@
 'use strict';
 /* ═══════════════════════════════════════════════════════════════════════
    app.js — Client-side state management and screen routing
-   Depends on: socket.js (SocketBridge), ui.js (UI)
+   Depends on: peer.js (PeerBridge), ui.js (UI)
+   Transport: PeerBridge replaces SocketBridge — same emit()/id() API.
 ═══════════════════════════════════════════════════════════════════════ */
 
 const App = (() => {
@@ -63,15 +64,26 @@ const App = (() => {
     if (!name) return showError('Please enter your name.');
 
     state.myName = name;
-    SocketBridge.emit('createRoom', { name }, (res) => {
-      if (res.error) return showError(res.error);
-      state.myId    = SocketBridge.id();
-      state.roomCode = res.code;
-      state.isHost  = true;
-      state.players = res.room.players;
-      state.playerCount = res.room.playerCount;
+    showError('Connecting…');
 
-      _enterWaitingRoom();
+    // Room code is embedded in the host's PeerJS peer ID
+    const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+
+    PeerBridge.init(true, roomCode, name, {
+      onReady: (peerId) => {
+        state.myId = peerId;
+        // Run createRoom locally on the host's roomManager
+        PeerBridge.emit('createRoom', { name }, (res) => {
+          if (res.error) return showError(res.error);
+          state.roomCode    = res.code;
+          state.isHost      = true;
+          state.players     = res.room.players;
+          state.playerCount = res.room.playerCount;
+          clearError();
+          _enterWaitingRoom();
+        });
+      },
+      onError: (msg) => showError('Connection error: ' + msg),
     });
   }
 
@@ -83,16 +95,27 @@ const App = (() => {
     if (!code || code.length < 4) return showError('Please enter a valid room code.');
 
     state.myName = name;
-    SocketBridge.emit('joinRoom', { name, code }, (res) => {
-      if (res.error) return showError(res.error);
-      state.myId    = SocketBridge.id();
-      state.roomCode = res.room.code;
-      state.isHost  = false;
-      state.players = res.room.players;
-      state.playerCount = res.room.playerCount;
+    showError('Connecting…');
 
-      _enterWaitingRoom();
+    PeerBridge.init(false, code, name, {
+      onReady: (peerId) => {
+        state.myId = peerId;
+        // Connect to the host peer; join ack comes via App.onJoinAck()
+        PeerBridge.connectToHost(code, name);
+      },
+      onError: (msg) => showError('Connection error: ' + msg),
     });
+  }
+
+  // ── Join Ack (guest only — called by peer.js after host responds) ──────
+  function onJoinAck(res) {
+    if (res.error) return showError(res.error);
+    state.roomCode    = res.room.code;
+    state.isHost      = false;
+    state.players     = res.room.players;
+    state.playerCount = res.room.playerCount;
+    clearError();
+    _enterWaitingRoom();
   }
 
   // ── Enter waiting room (shared after create/join) ──────────────────────
@@ -113,10 +136,9 @@ const App = (() => {
 
   // ── Set Player Count ───────────────────────────────────────────────────
   function setPlayerCount(count) {
-    SocketBridge.emit('setPlayerCount', { code: state.roomCode, count }, (res) => {
+    PeerBridge.emit('setPlayerCount', { code: state.roomCode, count }, (res) => {
       if (res.error) return console.warn('setPlayerCount error:', res.error);
       state.playerCount = count;
-      // Highlight active button
       document.querySelectorAll('.count-btn').forEach(btn => {
         btn.classList.toggle('active', parseInt(btn.dataset.count) === count);
       });
@@ -125,14 +147,14 @@ const App = (() => {
 
   // ── Start Game ─────────────────────────────────────────────────────────
   function startGame() {
-    SocketBridge.emit('startGame', { code: state.roomCode }, (res) => {
+    PeerBridge.emit('startGame', { code: state.roomCode }, (res) => {
       if (res.error) return alert('Could not start: ' + res.error);
     });
   }
 
   // ── Start Next Round ───────────────────────────────────────────────────
   function startNextRound() {
-    SocketBridge.emit('startNewRound', { code: state.roomCode }, (res) => {
+    PeerBridge.emit('startNewRound', { code: state.roomCode }, (res) => {
       if (res.error) return alert('Could not start round: ' + res.error);
     });
   }
@@ -140,9 +162,8 @@ const App = (() => {
   // ── Play Card ──────────────────────────────────────────────────────────
   function playCard(cardId) {
     if (state.currentTurn !== state.myId) return;
-    SocketBridge.emit('playCard', { code: state.roomCode, cardId }, (res) => {
+    PeerBridge.emit('playCard', { code: state.roomCode, cardId }, (res) => {
       if (res.error) {
-        // Flash the error briefly in the turn indicator
         const ind = document.getElementById('my-turn-indicator');
         const prev = ind.textContent;
         ind.textContent = '⚠ ' + res.error;
@@ -169,7 +190,7 @@ const App = (() => {
 
   // ── Back to Lobby ──────────────────────────────────────────────────────
   function backToLobby() {
-    // Reset state
+    PeerBridge.destroy();
     Object.assign(state, {
       myId: null, myName: null, roomCode: null, isHost: false,
       players: [], playerCount: 4, myHand: [], myTeam: 0, mySeat: 0,
@@ -182,7 +203,7 @@ const App = (() => {
 
   // ── Internal: update start button visibility ───────────────────────────
   function _updateStartButton() {
-    const btn = document.getElementById('btn-start');
+    const btn    = document.getElementById('btn-start');
     const status = document.getElementById('waiting-status');
     if (!btn || !state.isHost) return;
 
@@ -198,7 +219,7 @@ const App = (() => {
     }
   }
 
-  // ── Event handlers called by socket.js ────────────────────────────────
+  // ── Event handlers called by peer.js ──────────────────────────────────
 
   function onLobbyUpdate({ players, playerCount, host }) {
     state.players     = players;
@@ -208,18 +229,15 @@ const App = (() => {
     UI.renderPlayerSlots(players, playerCount);
     _updateStartButton();
 
-    // Update host controls visibility dynamically
     const hostCtrls = document.getElementById('host-controls');
     if (hostCtrls) hostCtrls.classList.toggle('hidden', !state.isHost);
 
-    // Sync count-btn highlight
     document.querySelectorAll('.count-btn').forEach(btn => {
       btn.classList.toggle('active', parseInt(btn.dataset.count) === playerCount);
     });
   }
 
   function onGameStart(data) {
-    // Store everything
     state.myHand      = data.hand;
     state.players     = data.players;
     state.teamNames   = data.teamNames;
@@ -243,11 +261,9 @@ const App = (() => {
     state.currentTurn = currentTurn;
     state.ledSuit     = trickSoFar.length > 0 ? trickSoFar[0].card.suit : null;
 
-    // Track trick cards for rendering
-    const player = state.players.find(p => p.id === playerId);
     state.trickCards = trickSoFar.map(t => ({
-      playerId: t.playerId,
-      card: t.card,
+      playerId:   t.playerId,
+      card:       t.card,
       playerName: state.players.find(p => p.id === t.playerId)?.name || '?',
     }));
 
@@ -272,7 +288,6 @@ const App = (() => {
     state.ledSuit     = null;
     state.trickCards  = [];
 
-    // Animate sweep then clear
     UI.sweepTrick(winnerId, () => {
       state.trickCards = [];
       UI.renderTrickArea([]);
@@ -290,7 +305,6 @@ const App = (() => {
   }
 
   function onMatchOver({ winner, matchScores, teamNames }) {
-    // Already on result screen — show match winner banner
     UI.showMatchWinner(winner, teamNames || state.teamNames);
     document.getElementById('btn-next-round')?.classList.add('hidden');
   }
@@ -303,25 +317,20 @@ const App = (() => {
 
   // ── Private: render the full game screen layout ────────────────────────
   function _renderGameScreen() {
-    // HUD
     document.getElementById('hud-round').textContent = state.round;
     document.getElementById('hud-trump-suit').textContent = '—';
     document.getElementById('hud-trump-suit').className = 'hud-trump-suit';
     _updateHudScores();
     _updateHudTricks();
 
-    // My info bar
     document.getElementById('my-name-tag').textContent = state.myName || '';
 
-    // Opponents around the table
     const myIndex = state.players.findIndex(p => p.id === state.myId);
     UI.renderOpponents(state.players, myIndex, state.tricksWon, state.currentTurn);
 
-    // My hand
     const isMyTurn = state.currentTurn === state.myId;
     UI.renderMyHand(state.myHand, isMyTurn, state.trump, state.ledSuit, playCard);
 
-    // Turn indicator
     _updateTurnUI();
   }
 
@@ -343,11 +352,7 @@ const App = (() => {
       }
     }
 
-    // Re-render hand with updated playability
-    const isMyTurnNow = state.currentTurn === state.myId;
-    UI.renderMyHand(state.myHand, isMyTurnNow, state.trump, state.ledSuit, playCard);
-
-    // Update opponent highlights
+    UI.renderMyHand(state.myHand, isMyTurn, state.trump, state.ledSuit, playCard);
     UI.updateOpponentTurnHighlight(state.currentTurn);
   }
 
@@ -364,7 +369,6 @@ const App = (() => {
     const el = document.getElementById('hud-tricks-display');
     if (el) el.textContent = `${state.tricksWon[0]}–${state.tricksWon[1]}`;
 
-    // Update my tricks count
     const myTricks = document.getElementById('my-tricks-count');
     const myTens   = document.getElementById('my-tens-count');
     if (myTricks) myTricks.textContent = `Tricks: ${state.tricksWon[state.myTeam]}`;
@@ -385,7 +389,8 @@ const App = (() => {
     playCard,
     copyCode,
     backToLobby,
-    // Handlers for socket.js
+    // Handlers called by peer.js
+    onJoinAck,
     onLobbyUpdate,
     onGameStart,
     onCardPlayed,
